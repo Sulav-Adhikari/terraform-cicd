@@ -3,11 +3,11 @@ variable "region" {
 }
 
 variable "tf_backend" {
-  default = "sulav-S3-terraform-state"
+  default = "sulav-s3-terraform-state"
 }
 
 
-variable "frontend_bucket_name" {
+variable "bucket_name" {
   type    = string
   default = "sulav-s3-bucket"
 }
