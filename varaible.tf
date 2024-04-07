@@ -1,4 +1,4 @@
-#variableforproject
+#variable for project testing the workflow
 
 variable "region" {
   default = "us-east-1"
