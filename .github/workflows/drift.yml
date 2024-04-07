@@ -1,0 +1,73 @@
+name: Drift Detection and Reconciliation
+
+on:
+  schedule:
+    - cron: '0 0 * * *' 
+
+jobs:
+  build:
+    name: Deploy and Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Configure Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Terraform format
+        run: terraform fmt -check -recursive
+      
+      - name: Terraform init
+        run: terraform init
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+      
+      - name: Terraform validate
+        run: terraform validate
+      
+      - name: Terraform Workspace Select
+        run: terraform workspace select -or-create dev
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+      
+      - name: Terraform plan
+        id: plan
+        run: terraform plan -detailed-exitcode
+        continue-on-error: true
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Check for changes
+        run: |
+          if [ ${{ steps.plan.outputs.exitcode }} -eq 2 ]; then
+            echo "There are changes in the infrastructure."
+            # Reconcile changes
+            terraform apply --auto-approve
+          elif [ ${{ steps.plan.outputs.exitcode }} -eq 1 ]; then
+            echo "There are no changes in the infrastructure."
+          else
+            echo "Error occurred while checking for changes."
+            exit 1
+          fi
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+       
+      - name: Apply changes if necessary
+        if: steps.plan.outputs.exitcode == 2
+        run: |
+          terraform apply --auto-approve
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
